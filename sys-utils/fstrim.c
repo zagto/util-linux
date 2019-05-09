@@ -237,10 +237,16 @@ static int fstrim_all(struct fstrim_control *ctl)
 	if (!itr)
 		err(MNT_EX_FAIL, _("failed to initialize libmount iterator"));
 
-	if (ctl->fstab)
-		filename = mnt_get_fstab_path();
+	if (ctl->fstab) {
+		tab = mnt_new_table();
 
-	tab = mnt_new_table_from_file(filename);
+		if (tab && mnt_table_parse_fstab(tab, NULL) != 0) {
+			mnt_unref_table(tab);
+			tab = NULL;
+		}
+	} else
+		tab = mnt_new_table_from_file(filename);
+
 	if (!tab)
 		err(MNT_EX_FAIL, _("failed to parse %s"), filename);
 
