@@ -1910,6 +1910,35 @@ done:
 	return rc;
 }
 
+static int test_fstab(struct libmnt_test *ts, int argc, char *argv[])
+{
+	struct libmnt_table *tb = NULL;
+	struct libmnt_iter *itr = NULL;
+	struct libmnt_fs *fs;
+	int rc = -1;
+
+	tb = mnt_new_table();
+	if (!tb)
+		return -1;
+
+	mnt_table_set_parser_errcb(tb, parser_errcb);
+	rc = mnt_table_parse_fstab(tb, NULL);
+	if (rc)
+		goto done;
+
+	itr = mnt_new_iter(MNT_ITER_FORWARD);
+	if (!itr)
+		goto done;
+
+	while(mnt_table_next_fs(tb, itr, &fs) == 0)
+		mnt_fs_print_debug(fs, stdout);
+	rc = 0;
+done:
+	mnt_free_iter(itr);
+	mnt_unref_table(tb);
+	return rc;
+}
+
 static int test_find_idx(struct libmnt_test *ts, int argc, char *argv[])
 {
 	struct libmnt_table *tb;
@@ -2157,6 +2186,7 @@ int main(int argc, char *argv[])
 {
 	struct libmnt_test tss[] = {
 	{ "--parse",    test_parse,        "<file> [--comments] parse and print tab" },
+	{ "--fstab",    test_fstab,        "parse and print fstab" },
 	{ "--find-forward",  test_find_fw, "<file> <source|target> <string>" },
 	{ "--find-backward", test_find_bw, "<file> <source|target> <string>" },
 	{ "--uniq-target",   test_uniq,    "<file>" },

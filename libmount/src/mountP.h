@@ -106,6 +106,8 @@ extern int mnt_parse_offset(const char *str, size_t len, uintmax_t *res);
 
 extern int mnt_chdir_to_parent(const char *target, char **filename);
 
+extern const char *mnt_get_fstabdir_path(void);
+
 extern char *mnt_get_username(const uid_t uid);
 extern int mnt_get_uid(const char *username, uid_t *uid);
 extern int mnt_get_gid(const char *groupname, gid_t *gid);

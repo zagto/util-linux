@@ -836,6 +836,19 @@ const char *mnt_get_fstab_path(void)
 	return p ? : _PATH_MNTTAB;
 }
 
+/*
+ * mnt_get_fstabdir_path:
+ *
+ * EXPERIMENTAL -- DO NOT EXPORT BY API yet
+ *
+ * Returns: path to /etc/fstab.d or $LIBMOUNT_FSTABDIR.
+ */
+const char *mnt_get_fstabdir_path(void)
+{
+	const char *p = safe_getenv("LIBMOUNT_FSTABDIR");
+	return p ? : _PATH_MNTTABDIR;
+}
+
 /**
  * mnt_get_mtab_path:
  *

@@ -124,6 +124,10 @@
 # endif
 #endif
 
+#ifndef _PATH_MNTTABDIR
+# define _PATH_MNTTABDIR	"/etc/fstab.d"
+#endif
+
 #ifndef _PATH_DEV
   /*
    * The tailing '/' in _PATH_DEV is there for compatibility with libc.

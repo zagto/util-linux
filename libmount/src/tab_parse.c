@@ -1073,6 +1073,11 @@ int mnt_table_parse_swaps(struct libmnt_table *tb, const char *filename)
  * This function parses /etc/fstab and appends new lines to the @tab. If the
  * @filename is a directory, then mnt_table_parse_dir() is called.
  *
+ * If libmount is compiled with --enable-libmount-support-fstabdir and
+ * @filename is NULL then /etc/fstab.d (or $LIBMOUNT_FSTABDIR) is parsed after
+ * /etc/fstab. Note that @filename forces libmount to parse only specified
+ * file/dir and nothing else.
+ *
  * See also mnt_table_set_parser_errcb().
  *
  * Returns: 0 on success or negative number in case of error.
@@ -1080,26 +1085,39 @@ int mnt_table_parse_swaps(struct libmnt_table *tb, const char *filename)
 int mnt_table_parse_fstab(struct libmnt_table *tb, const char *filename)
 {
 	struct stat st;
-	int rc = 0;
+	int rc = 0, is_default = 0;
 
 	if (!tb)
 		return -EINVAL;
-	if (!filename)
+	if (!filename) {
 		filename = mnt_get_fstab_path();
-	if (!filename)
-		return -EINVAL;
-	if (stat(filename, &st) != 0)
-		return -errno;
+		is_default = 1;
+	}
 
-	tb->fmt = MNT_FMT_FSTAB;
+	/* Note that $LIBMOUNT_FSTAB and @filename may points to
+	 * file or directory.
+	 */
+	if (filename && stat(filename, &st) == 0) {
+		tb->fmt = MNT_FMT_FSTAB;
+		if (S_ISREG(st.st_mode))
+			rc = mnt_table_parse_file(tb, filename);
+		else if (S_ISDIR(st.st_mode))
+			rc = mnt_table_parse_dir(tb, filename);
+	}
 
-	if (S_ISREG(st.st_mode))
-		rc = mnt_table_parse_file(tb, filename);
-	else if (S_ISDIR(st.st_mode))
-		rc = mnt_table_parse_dir(tb, filename);
-	else
-		rc = -EINVAL;
+	/* Optional fstab.d/ directory */
+#ifdef USE_LIBMOUNT_SUPPORT_FSTABDIR
+	if (rc == 0 && is_default) {
+		const char *dirname = mnt_get_fstabdir_path();
 
+		if (dirname && filename && streq_paths(filename, dirname))
+			dirname = NULL;
+		if (dirname)
+			rc = mnt_table_parse_dir(tb, dirname);
+	}
+#endif
+	DBG(TAB, ul_debugobj(tb, "fstab parsed [rc=%d, is_default=%s]",
+				rc, is_default ? "y" : "n"));
 	return rc;
 }
 

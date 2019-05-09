@@ -1118,10 +1118,19 @@ AC_ARG_ENABLE([libmount-support-mtab],
   AS_HELP_STRING([--enable-libmount-support-mtab], [support /etc/mtab (default is use /proc/self/mountinfo)]),
   [], [enable_libmount_support_mtab=no]
 )
-
 AS_IF([test "x$enable_libmount_support_mtab" = xyes], [
   AC_DEFINE([USE_LIBMOUNT_SUPPORT_MTAB], [1], [Define to 1 if want to support mtab.])
 ])
+
+
+AC_ARG_ENABLE([libmount-support-fstabdir],
+  AS_HELP_STRING([--enable-libmount-support-fstabdir], [support /etc/fstab.d as extension to /etc/fstab]),
+  [], [enable_libmount_support_fstabdir=no]
+)
+AS_IF([test "x$enable_libmount_support_fstabdir" = xyes], [
+  AC_DEFINE([USE_LIBMOUNT_SUPPORT_FSTABDIR], [1], [Define to 1 if want to support fstab.d.])
+])
+
 
 dnl
 dnl libsmartcols
