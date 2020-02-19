@@ -658,6 +658,9 @@ display_time(struct timeval hwctime)
  * PCIL: persistent_clock_is_local, sets the "11 minute mode" timescale.
  * firsttime: locks the warp_clock function (initialized to 1 at boot).
  *
+ * Note that very first settimeofday(NULL, tz) modifies warp-clock as well as
+ * system TZ.
+ *
  * +---------------------------------------------------------------------------+
  * |  op     | RTC scale | settimeofday calls                                  |
  * |---------|-----------|-----------------------------------------------------|
@@ -675,41 +678,45 @@ set_system_clock(const struct hwclock_control *ctl,
 	struct tm broken;
 	int minuteswest;
 	int rc = 0;
-	const struct timezone tz_utc = { 0 };
 
 	localtime_r(&newtime.tv_sec, &broken);
 	minuteswest = -get_gmtoff(&broken) / 60;
 
 	if (ctl->verbose) {
-		if (ctl->hctosys && !ctl->universal)
-			printf(_("Calling settimeofday(NULL, %d) to set "
-				 "persistent_clock_is_local.\n"), minuteswest);
-		if (ctl->systz && ctl->universal)
+		if (ctl->universal)
 			puts(_("Calling settimeofday(NULL, 0) "
-				"to lock the warp function."));
+			       "to lock the warp function."));
+		else
+			printf(_("Calling settimeofday(NULL, %d) to set "
+				 "persistent_clock_is_local and "
+				 "the kernel timezone.\n"), minuteswest);
+
+		if (ctl->universal && minuteswest)
+			printf(_("Calling settimeofday(NULL, %d) to set "
+				 "the kernel timezone.\n"), minuteswest);
+
 		if (ctl->hctosys)
-			printf(_("Calling settimeofday(%ld.%06ld, %d)\n"),
-			       newtime.tv_sec, newtime.tv_usec, minuteswest);
-		else {
-			printf(_("Calling settimeofday(NULL, %d) "), minuteswest);
-			if (ctl->universal)
-				 puts(_("to set the kernel timezone."));
-			else
-				 puts(_("to warp System time."));
-		}
+			printf(_("Calling settimeofday(%ld.%06ld, 0) to set "
+			         "the kernel time.\n"), newtime.tv_sec, newtime.tv_usec);
 	}
 
 	if (!ctl->testing) {
+		const struct timezone tz_utc = { 0 };
 		const struct timezone tz = { minuteswest };
 
-		if (ctl->hctosys && !ctl->universal)	/* set PCIL */
+		/* warp-clock */
+		if (ctl->universal)
+			rc = settimeofday(NULL, &tz_utc); /* lock to UTC */
+		else
+			rc = settimeofday(NULL, &tz);     /* set PCIL and TZ */
+
+		/* set timezone */
+		if (!rc && ctl->universal && minuteswest)
 			rc = settimeofday(NULL, &tz);
-		if (ctl->systz && ctl->universal)	/* lock warp_clock */
-			rc = settimeofday(NULL, &tz_utc);
+
+		/* set time */
 		if (!rc && ctl->hctosys)
-			rc = settimeofday(&newtime, &tz);
-		else if (!rc)
-			rc = settimeofday(NULL, &tz);
+			rc = settimeofday(&newtime, NULL);
 
 		if (rc) {
 			warn(_("settimeofday() failed"));
