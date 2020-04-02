@@ -144,6 +144,11 @@ extern int __mnt_table_is_fs_mounted(	struct libmnt_table *tb,
 					struct libmnt_fs *fstab_fs,
 					const char *tgt_prefix);
 
+extern struct libmnt_fs *mnt_table_find_triplet(struct libmnt_table *tb,
+                        const char *srcpath, const char *target,
+                        const char *root, int direction);
+
+
 /*
  * Generic iterator
  */

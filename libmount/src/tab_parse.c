@@ -1177,7 +1177,6 @@ int mnt_table_parse_fstab(struct libmnt_table *tb, const char *filename)
 static struct libmnt_fs *mnt_table_merge_utab_fs(struct libmnt_table *tb, struct libmnt_fs *uf)
 {
 	struct libmnt_fs *fs;
-	struct libmnt_iter itr;
 	const char *src, *target, *root;
 
 	if (!tb || !uf)
@@ -1192,21 +1191,7 @@ static struct libmnt_fs *mnt_table_merge_utab_fs(struct libmnt_table *tb, struct
 	if (!src || !target || !root)
 		return NULL;
 
-	mnt_reset_iter(&itr, MNT_ITER_BACKWARD);
-
-	while (mnt_table_next_fs(tb, &itr, &fs) == 0) {
-		const char *r;
-
-		if (fs->flags & MNT_FS_MERGED)
-			continue;
-
-		r = mnt_fs_get_root(fs);
-		if (r && strcmp(r, root) == 0
-		    && mnt_fs_streq_target(fs, target)
-		    && mnt_fs_streq_srcpath(fs, src))
-			break;
-	}
-
+	fs = mnt_table_find_triplet(tb, src, target, root, MNT_ITER_BACKWARD);
 	if (fs) {
 		DBG(TAB, ul_debugobj(tb, "found fs -- appending user optstr"));
 		mnt_fs_merge_utab(fs, uf);

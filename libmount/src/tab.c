@@ -1360,6 +1360,39 @@ struct libmnt_fs *mnt_table_find_pair(struct libmnt_table *tb, const char *sourc
 	return NULL;
 }
 
+/*
+ * Returns fs whicg match srcpath, target and root. The function does not
+ * canonicalize, do not covert tags, etc.
+ */
+struct libmnt_fs *mnt_table_find_triplet(struct libmnt_table *tb,
+			const char *srcpath, const char *target,
+			const char *root, int direction)
+{
+	struct libmnt_fs *fs = NULL;
+	struct libmnt_iter itr;
+
+	if (!tb || !target || !*target
+	    || !srcpath || !*srcpath
+	    || !root || !*root)
+		return NULL;
+
+	if (direction != MNT_ITER_FORWARD && direction != MNT_ITER_BACKWARD)
+		return NULL;
+
+	mnt_reset_iter(&itr, direction);
+
+	while (mnt_table_next_fs(tb, &itr, &fs) == 0) {
+		const char *r = mnt_fs_get_root(fs);
+
+		if (r && strcmp(r, root) == 0
+		    && mnt_fs_streq_target(fs, target)
+		    && mnt_fs_streq_srcpath(fs, srcpath))
+			return fs;
+	}
+
+	return NULL;
+}
+
 /**
  * mnt_table_find_devno
  * @tb: /proc/self/mountinfo
