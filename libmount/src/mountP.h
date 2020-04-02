@@ -198,6 +198,7 @@ struct libmnt_fs {
 	char		*optstr;	/* fstab[4], merged options */
 	char		*vfs_optstr;	/* mountinfo[6]: fs-independent (VFS) options */
 	char		*opt_fields;	/* mountinfo[7]: optional fields */
+	unsigned int	propagation;	/* parsed opt_fields */
 	char		*fs_optstr;	/* mountinfo[11]: fs-dependent options */
 	char		*user_optstr;	/* userspace mount options */
 	char		*attrs;		/* mount attributes */
@@ -412,6 +413,8 @@ extern struct libmnt_fs *mnt_copy_mtab_fs(const struct libmnt_fs *fs)
 extern int __mnt_fs_set_source_ptr(struct libmnt_fs *fs, char *source)
 			__attribute__((nonnull(1)));
 extern int __mnt_fs_set_fstype_ptr(struct libmnt_fs *fs, char *fstype)
+			__attribute__((nonnull(1)));
+extern int __mnt_fs_set_propagation_from_string(struct libmnt_fs *fs, const char *str)
 			__attribute__((nonnull(1)));
 
 /* context.c */

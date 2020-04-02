@@ -245,8 +245,13 @@ static int mnt_parse_mountinfo_line(struct libmnt_fs *fs, const char *s)
 		DBG(TAB, ul_debug("mountinfo parse error: separator not found"));
 		return -EINVAL;
 	}
-	if (p > s + 1)
+	if (p > s + 1) {
 		fs->opt_fields = strndup(s + 1, p - s - 1);
+		if (!fs->opt_fields)
+			goto fail;
+
+		__mnt_fs_set_propagation_from_string(fs, fs->opt_fields);
+	}
 
 	s = skip_separator(p + 3);
 

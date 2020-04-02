@@ -557,39 +557,39 @@ static int mnt_fs_get_flags(struct libmnt_fs *fs)
 	return fs ? fs->flags : 0;
 }
 
+int __mnt_fs_set_propagation_from_string(struct libmnt_fs *fs, const char *str)
+{
+	assert(fs);
+
+	fs->propagation = 0;
+	if (!str)
+		return 0;
+	 /*
+	 * The optional fields format is incompatible with mount options
+	 * ... we have to parse the field here.
+	 */
+	fs->propagation |= strstr(str, "shared:") ? MS_SHARED : MS_PRIVATE;
+
+	if (strstr(str, "master:"))
+		fs->propagation |= MS_SLAVE;
+	if (strstr(str, "unbindable"))
+		fs->propagation |= MS_UNBINDABLE;
+	return 0;
+}
+
 /**
  * mnt_fs_get_propagation:
  * @fs: mountinfo entry
  * @flags: returns propagation MS_* flags as present in the mountinfo file
  *
- * Note that this function sets @flags to zero if no propagation flags are found
- * in the mountinfo file. The kernel default is MS_PRIVATE, this flag is not stored
- * in the mountinfo file.
- *
  * Returns: 0 on success or negative number in case of error.
  */
 int mnt_fs_get_propagation(struct libmnt_fs *fs, unsigned long *flags)
 {
-	if (!fs || !flags)
-		return -EINVAL;
+	if (fs && flags)
+		*flags = fs->propagation;
 
-	*flags = 0;
-
-	if (!fs->opt_fields)
-		return 0;
-
-	 /*
-	 * The optional fields format is incompatible with mount options
-	 * ... we have to parse the field here.
-	 */
-	*flags |= strstr(fs->opt_fields, "shared:") ? MS_SHARED : MS_PRIVATE;
-
-	if (strstr(fs->opt_fields, "master:"))
-		*flags |= MS_SLAVE;
-	if (strstr(fs->opt_fields, "unbindable"))
-		*flags |= MS_UNBINDABLE;
-
-	return 0;
+	return fs ? 0 : -EINVAL;
 }
 
 /**
