@@ -1622,3 +1622,30 @@ err:
 		mnt_free_mntent(m);
 	return rc;
 }
+
+
+/*
+ * Merge @uf from utab to @fs
+ */
+int mnt_fs_merge_utab(struct libmnt_fs *fs, struct libmnt_fs *uf)
+{
+	const char *p;
+
+	assert(fs);
+	assert(uf);
+
+	p = mnt_fs_get_user_options(uf);
+	if (p)
+		mnt_fs_append_options(fs, p);
+
+	p = mnt_fs_get_attributes(uf);
+	if (p)
+		mnt_fs_append_attributes(fs, p);
+
+	p = mnt_fs_get_bindsrc(uf);
+	if (p)
+		mnt_fs_set_bindsrc(fs, p);
+
+	fs->flags |= MNT_FS_MERGED;
+	return 0;
+}

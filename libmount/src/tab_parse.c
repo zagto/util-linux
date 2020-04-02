@@ -1174,11 +1174,11 @@ int mnt_table_parse_fstab(struct libmnt_table *tb, const char *filename)
  *
  * Returns modified filesystem (from @tb) or NULL.
  */
-static struct libmnt_fs *mnt_table_merge_user_fs(struct libmnt_table *tb, struct libmnt_fs *uf)
+static struct libmnt_fs *mnt_table_merge_utab_fs(struct libmnt_table *tb, struct libmnt_fs *uf)
 {
 	struct libmnt_fs *fs;
 	struct libmnt_iter itr;
-	const char *optstr, *src, *target, *root, *attrs;
+	const char *src, *target, *root;
 
 	if (!tb || !uf)
 		return NULL;
@@ -1187,21 +1187,20 @@ static struct libmnt_fs *mnt_table_merge_user_fs(struct libmnt_table *tb, struct
 
 	src = mnt_fs_get_srcpath(uf);
 	target = mnt_fs_get_target(uf);
-	optstr = mnt_fs_get_user_options(uf);
-	attrs = mnt_fs_get_attributes(uf);
 	root = mnt_fs_get_root(uf);
 
-	if (!src || !target || !root || (!attrs && !optstr))
+	if (!src || !target || !root)
 		return NULL;
 
 	mnt_reset_iter(&itr, MNT_ITER_BACKWARD);
 
-	while(mnt_table_next_fs(tb, &itr, &fs) == 0) {
-		const char *r = mnt_fs_get_root(fs);
+	while (mnt_table_next_fs(tb, &itr, &fs) == 0) {
+		const char *r;
 
 		if (fs->flags & MNT_FS_MERGED)
 			continue;
 
+		r = mnt_fs_get_root(fs);
 		if (r && strcmp(r, root) == 0
 		    && mnt_fs_streq_target(fs, target)
 		    && mnt_fs_streq_srcpath(fs, src))
@@ -1210,11 +1209,7 @@ static struct libmnt_fs *mnt_table_merge_user_fs(struct libmnt_table *tb, struct
 
 	if (fs) {
 		DBG(TAB, ul_debugobj(tb, "found fs -- appending user optstr"));
-		mnt_fs_append_options(fs, optstr);
-		mnt_fs_append_attributes(fs, attrs);
-		mnt_fs_set_bindsrc(fs, mnt_fs_get_bindsrc(uf));
-		fs->flags |= MNT_FS_MERGED;
-
+		mnt_fs_merge_utab(fs, uf);
 		DBG(TAB, ul_debugobj(tb, "found fs:"));
 		DBG(TAB, mnt_fs_print_debug(fs, stderr));
 	}
@@ -1310,10 +1305,9 @@ read_utab:
 		mnt_reset_iter(&itr, MNT_ITER_BACKWARD);
 
 		/*  merge user options into mountinfo from the kernel */
-		while(mnt_table_next_fs(u_tb, &itr, &u_fs) == 0)
-			mnt_table_merge_user_fs(tb, u_fs);
+		while (mnt_table_next_fs(u_tb, &itr, &u_fs) == 0)
+			mnt_table_merge_utab_fs(tb, u_fs);
 	}
-
 
 	if (priv_utab)
 		mnt_unref_table(u_tb);
