@@ -1649,3 +1649,152 @@ int mnt_fs_merge_utab(struct libmnt_fs *fs, struct libmnt_fs *uf)
 	fs->flags |= MNT_FS_MERGED;
 	return 0;
 }
+
+
+#include <sys/syscall.h>
+#include <linux/fsinfo.h>
+
+#define __NR_fsinfo 441
+static ssize_t fsinfo(int dfd, const char *filename,
+	       struct fsinfo_params *params, size_t params_size,
+	       void *result_buffer, size_t result_buf_size)
+{
+	return syscall(__NR_fsinfo, dfd, filename,
+		       params, params_size,
+		       result_buffer, result_buf_size);
+}
+
+static int fsinfo_id2target(unsigned int id, char *buf, size_t bufsz)
+{
+	/* open by ID to target */
+	char idstr[sizeof(stringify_value(UINT_MAX))];
+	ssize_t res;
+
+	/* ask for moutpoint name */
+	struct fsinfo_params params = {
+		.request = FSINFO_ATTR_MOUNT_POINT_FULL,
+		.flags = FSINFO_FLAGS_QUERY_MOUNT
+	};
+
+	snprintf(idstr, sizeof(idstr), "%u", id);
+	res = fsinfo(AT_FDCWD, idstr, &params, sizeof(params), buf, bufsz);
+	if (res < 0)
+		return -errno;
+	if ((size_t) res >= sizeof(buf))
+		return -ENAMETOOLONG;
+	buf[res] = '\0';
+
+	return 0;
+}
+
+
+static int fsinfo_buf2fs(struct libmnt_fs *fs, int request,
+			 char *buf, size_t bufsz, size_t len)
+{
+	int rc = 0;
+
+	switch (request) {
+	case FSINFO_ATTR_SOURCE:
+		buf[len] = '\0';
+		rc = mnt_fs_set_source(fs, buf);
+		break;
+	case FSINFO_ATTR_CONFIGURATION:
+		buf[len] = '\0';
+		rc = strdup_to_struct_member(fs, fs_optstr, buf);
+		break;
+	case FSINFO_ATTR_MOUNT_PATH:
+		buf[len] = '\0';
+		rc = strdup_to_struct_member(fs, root, buf);
+		break;
+	case FSINFO_ATTR_MOUNT_POINT_FULL:
+		buf[len] = '\0';
+		rc = strdup_to_struct_member(fs, target, buf);
+		break;
+	case FSINFO_ATTR_IDS:
+	{
+		struct fsinfo_ids *x = (struct fsinfo_ids *) buf;
+		/* devno */
+		fs->devno = makedev(x->f_dev_major, x->f_dev_minor);
+		/* FS-type */
+		mnt_fs_set_fstype(fs, x->f_fs_name);
+		break;
+	}
+	case FSINFO_ATTR_MOUNT_INFO:
+	{
+		struct fsinfo_mount_info *x = (struct fsinfo_mount_info *) buf;
+		/* mount ID */
+		fs->id = x->mnt_id;
+		/* VFS  options (convert it to strings) */
+		free(fs->vfs_optstr);
+		fs->vfs_optstr = NULL;
+		rc = mnt_optstr_apply_flags(&fs->vfs_optstr, x->attr,
+				mnt_get_builtin_optmap(MNT_LINUX_MAP));
+		break;
+	}
+	case FSINFO_ATTR_MOUNT_TOPOLOGY:
+	{
+		struct fsinfo_mount_topology *x = (struct fsinfo_mount_topology *) buf;
+		fs->parent = x->parent_id;
+		fs->propagation = x->propagation;
+		break;
+	}
+	default:
+		assert(request);
+	}
+	return rc;
+}
+
+int mnt_fs_fetch_fsinfo(struct libmnt_fs *fs)
+{
+	int fd, i, rc = 0;
+	char buf[BUFSIZ];
+	int requests[] = {
+		FSINFO_ATTR_SOURCE,
+		FSINFO_ATTR_MOUNT_POINT_FULL,
+		FSINFO_ATTR_CONFIGURATION,
+		FSINFO_ATTR_MOUNT_PATH,
+		FSINFO_ATTR_IDS,
+		FSINFO_ATTR_MOUNT_INFO,
+		FSINFO_ATTR_MOUNT_TOPOLOGY
+	};
+
+	if (!fs->target && fs->id > 0) {
+		rc = fsinfo_id2target(fs->id, buf, sizeof(buf));
+		if (rc)
+			return rc;
+		rc = mnt_fs_set_target(fs, buf);
+		if (rc)
+			return rc;
+	}
+	if (!fs->target)
+		return -EINVAL;
+
+	fd = open(fs->target, O_PATH);
+	if (fd < 0)
+		return fd;
+
+	for (i = 0; i < ARRAY_SIZE(requests); i++) {
+		ssize_t res;
+		struct fsinfo_params params = {
+			.request = requests[i],
+			.flags = FSINFO_FLAGS_QUERY_FD
+		};
+
+		res = fsinfo(fd, NULL, &params, sizeof(params), buf, sizeof(buf));
+		if (res < 0)
+			rc = res;
+		if ((size_t) rc >= sizeof(buf))
+			rc = -ENAMETOOLONG;
+		if (rc == 0)
+			rc = fsinfo_buf2fs(fs, requests[i], buf, sizeof(buf), res);
+		if (rc)
+			break;	/* error */
+	}
+
+	if (rc == 0)
+		fs->flags |= MNT_FS_KERNEL;
+	close(fd);
+	return rc;
+}
+
+

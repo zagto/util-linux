@@ -334,6 +334,44 @@ static int lookup_umount_fs_by_mountinfo(struct libmnt_context *cxt, const char 
 	return 0;
 }
 
+/* returns: 1 not found; <0 on error; 1 success */
+static int lookup_umount_fs_by_fsinfo(struct libmnt_context *cxt)
+{
+	struct libmnt_fs *fs;
+	int rc;
+
+	DBG(CXT, ul_debugobj(cxt, " lookup by fsinfo"));
+
+	assert(cxt);
+	fs = cxt->fs;
+
+	assert(fs);
+	assert(mnt_fs_get_target(fs));
+
+	/* read data from kernel */
+	rc = mnt_fs_fetch_fsinfo(fs);
+	if (rc)
+		return rc;
+
+	/* merge utab to fs */
+	if (has_utab_entry(cxt, mnt_fs_get_target(fs))) {
+		struct libmnt_fs *uf;
+
+		uf = mnt_table_find_triplet(cxt->utab,
+				mnt_fs_get_srcpath(fs),
+				mnt_fs_get_target(fs),
+				mnt_fs_get_root(fs),
+				MNT_ITER_BACKWARD);
+		if (uf) {
+			mnt_fs_merge_utab(fs, uf);
+			DBG(CXT, ul_debugobj(cxt, "  utab applied by fsinfo"));
+		}
+	}
+
+	cxt->flags |= MNT_FL_TAB_APPLIED;
+	return 0;
+}
+
 /* This finction search for FS according to cxt->fs->target,
  * apply result to cxt->fs and it's umount replacement to
  * mnt_context_apply_fstab(), use mnt_context_tab_applied()
@@ -357,6 +395,11 @@ static int lookup_umount_fs(struct libmnt_context *cxt)
 		DBG(CXT, ul_debugobj(cxt, " undefined target"));
 		return -EINVAL;
 	}
+
+	/* try get fs by fsinfo() */
+	rc = lookup_umount_fs_by_fsinfo(cxt);
+	if (rc <= 0)
+		return rc;
 
 	/* try get fs type by statfs() */
 	rc = lookup_umount_fs_by_statfs(cxt, tgt);
