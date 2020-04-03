@@ -217,8 +217,8 @@ static int has_utab_entry(struct libmnt_context *cxt, const char *target)
 
 	assert(cxt);
 
-	if (!cxt->utab) {
-		const char *path = mnt_get_utab_path();
+	if (!cxt->utab && mnt_context_utab_writable(cxt)) {
+		const char *path = cxt->utab_path;
 
 		if (!path || is_file_empty(path))
 			return 0;
