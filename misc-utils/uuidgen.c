@@ -31,6 +31,7 @@ static void __attribute__((__noreturn__)) usage(void)
 	fputs(USAGE_OPTIONS, out);
 	fputs(_(" -r, --random        generate random-based uuid\n"), out);
 	fputs(_(" -t, --time          generate time-based uuid\n"), out);
+	fputs(_(" -c, --code          print result as C code definition with UUID_DEFINE\n"), out);
 	fputs(_(" -n, --namespace ns  generate hash-based uuid in this namespace\n"), out);
 	fputs(_(" -N, --name name     generate hash-based uuid from this name\n"), out);
 	fputs(_(" -m, --md5           generate md5 hash\n"), out);
@@ -78,11 +79,19 @@ badstring:
 	return value2;
 }
 
+static void print_as_code(const uuid_t uu) {
+	int i;
+	printf("UUID_DEFINE(, ");
+	for (i = 0; i < 15; i++)
+		printf("0x%02x, ", uu[i]);
+	printf("0x%02x);\n", uu[15]);
+}
+
 int
 main (int argc, char *argv[])
 {
 	int    c;
-	int    do_type = 0, is_hex = 0;
+	int    do_type = 0, is_hex = 0, print_code = 0;
 	char   str[UUID_STR_LEN];
 	char   *namespace = NULL, *name = NULL;
 	size_t namelen = 0;
@@ -91,6 +100,7 @@ main (int argc, char *argv[])
 	static const struct option longopts[] = {
 		{"random", no_argument, NULL, 'r'},
 		{"time", no_argument, NULL, 't'},
+		{"code", no_argument, NULL, 'c'},
 		{"version", no_argument, NULL, 'V'},
 		{"help", no_argument, NULL, 'h'},
 		{"namespace", required_argument, NULL, 'n'},
@@ -106,13 +116,16 @@ main (int argc, char *argv[])
 	textdomain(PACKAGE);
 	close_stdout_atexit();
 
-	while ((c = getopt_long(argc, argv, "rtVhn:N:msx", longopts, NULL)) != -1)
+	while ((c = getopt_long(argc, argv, "rtcVhn:N:msx", longopts, NULL)) != -1)
 		switch (c) {
 		case 't':
 			do_type = UUID_TYPE_DCE_TIME;
 			break;
 		case 'r':
 			do_type = UUID_TYPE_DCE_RANDOM;
+			break;
+		case 'c':
+			print_code = 1;
 			break;
 		case 'n':
 			namespace = optarg;
@@ -198,9 +211,12 @@ main (int argc, char *argv[])
 		break;
 	}
 
-	uuid_unparse(uu, str);
-
-	printf("%s\n", str);
+	if (print_code) {
+		print_as_code(uu);
+	} else {
+		uuid_unparse(uu, str);
+		printf("%s\n", str);
+	}
 
 	if (is_hex)
 		free(name);
